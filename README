@@ -1,3 +1,13 @@
-Right now, Rubol is a quick test to see if it would be easier and more instructive to show the value of Rebol to Ruby programmers by adapting it to be more Ruby like.
+Right now, Rubol is a quick test to see if it would be instructive to teach Rebol and show it's value to a certain community by adapting it to emulate some aspects of Ruby.
 
-More documentation and articles to come.  Stay tuned.
+Admittedly It's a rather unusual way to use (abuse?) a Rebol interpreter.  You'd certainly get better performance without going through the layer of abstraction.  However it's interesting that this is even *possible*... most languages would not be able to reshape themselves to so closely match another language.  Rebol does it with no external preprocessors or other crutches!!
+
+I kicked this off after looking at the 20-minute Ruby tutorial:
+
+	http://www.ruby-lang.org/en/documentation/quickstart/
+
+There are some other tutorials I'd like to incorporate, so this will probably be next:
+
+	http://juixe.com/techknow/index.php/2007/01/22/ruby-class-tutorial/
+
+It would obviously take a tremendous amount of time to feature-match Ruby, which isn't the goal.  The goal is merely to improve communication, and further development of this methodology could show Ruby what a more reflective system could be like without losing anything important.  So stay tuned.

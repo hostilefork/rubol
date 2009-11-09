@@ -26,20 +26,22 @@ Rebol [
 	But to look at how "rejoin" makes our life easier, let's go back to 
 	how we used to use compose to write our hello:
 	
-		puts to-string compose ["Hi " (.name) "!"]
+		puts compose ["Hi " (.name) "!"]
 
 	With rejoin we can take for granted the fact that it produces a
-	string, and we can avoid using the parentheses:
+	string, and we can avoid using the parentheses.  Because we know no
+	call to a to-string is needed, we can use Rebol's native print
+	function:
 
-		puts rejoin ["Hi " .name "!"]
+		print rejoin ["Hi " .name "!"]
 
-	That's shorter.  But Rebol has some other nice tricks up its sleeve.
+	That's a little purer.  But Rebol has some other nice tricks up its sleeve.
 	To name one that I think helps readability, there are english words
 	defined for for the space, tab, lf, cr, and null characters.  So long 
 	as you're doing a "reduce" with your "join" these words will be reduced 
 	to those strings:
 
-		puts rejoin ["Hi" space .name "!"]
+		print rejoin ["Hi" space .name "!"]
 
 	This Step 3 transformation does that upgrade.
 	}
@@ -50,15 +52,15 @@ Rebol [
 ; Include the code that makes Rebol act more like Ruby
 do %rubol.r
 
-Greeter: class [
+class Greeter [
 	initialize: def [name: "World"] [
 		.name: name
 	]
 	say_hi: does [
-		puts rejoin  ["Hi" space .name "!"]
+		print rejoin  ["Hi" space .name "!"]
 	]
 	say_bye: does [
-		puts rejoin ["Bye" space .name "," space "come back soon."]
+		print rejoin ["Bye" space .name "," space "come back soon."]
 	]
 ]
 

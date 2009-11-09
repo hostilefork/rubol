@@ -18,15 +18,15 @@ Rebol [
 ; Include the code that makes Rebol act more like Ruby
 do %rubol.r
 
-Greeter: class [
+class Greeter [
 	initialize: def [name: "World"] [
 		.name: name
 	]
 	say_hi: does [
-		puts to-string compose ["Hi " (.name) "!"]
+		puts compose ["Hi " (.name) "!"]
 	]
 	say_bye: does [
-		puts to-string compose ["Bye " (.name) ", come back soon."]
+		puts compose ["Bye " (.name) ", come back soon."]
 	]
 ]
 

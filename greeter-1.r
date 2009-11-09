@@ -1,13 +1,24 @@
 Rebol [
 	Title: "Greeter Ported From Ruby Step #1"
-	Description: {This is a very basic transformation of the code for the "Greeter"
-	in the Ruby samples into something that Rebol can successfully parse.  It's
-	not Rebol programming in the traditional sense... it's using some definitions
-	that allow the Rebol interpreter--at runtime--to execute something that
-	differs only superficially in its structure.
+	Description: {This is one of the most basic rote transformations of the code 
+	for the Greeter in the Ruby quickstart tutorial into "Rubol" (e.g. something
+	that has been brought in line with the required consistency that Rebol can 
+	parse, run, and reflect):
 
-	The files greeter-2.r, greeter-3.r, etc. demonstrate some more refinements
-	that let you see how much cleaner even this simple example can get in Rebol.
+		http://www.ruby-lang.org/en/documentation/quickstart/2/
+
+	Rebol is capable of more elegant expressions, which are shown as the 
+	refinements in the files greeter-2.r, greeter-3.r, etc.
+	}
+	Usage: {Fire up a Rebol interpreter in the directory where these files
+	are located.  Then at the command line, type:
+
+		do %greeter-1.r
+
+	When it runs, you should get the output:
+
+		Hi Pat!
+		Bye Pat, come back soon.
 	}
     	File: %greeter-1.r
 ]
@@ -15,15 +26,15 @@ Rebol [
 ; Include the code that makes Rebol act more like Ruby
 do %rubol.r
 
-Greeter: class [
+class Greeter [
 	initialize: def [name: "World"] [
 		.name: name
 	]
 	say_hi: def [] [
-		puts to-string compose ["Hi " (.name) "!"]
+		puts compose ["Hi " (.name) "!"]
 	]
 	say_bye: def [] [
-		puts to-string compose ["Bye " (.name) ", come back soon."]
+		puts compose ["Bye " (.name) ", come back soon."]
 	]
 ]
 

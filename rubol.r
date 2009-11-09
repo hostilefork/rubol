@@ -49,7 +49,7 @@ REBOL [
 
 do %func-static.r
 
-class: func [blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName] [
+class: func ['className blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName] [
 
 	; collect the set-words at the first level of the spec
 	; these are the member functions and declared members
@@ -97,9 +97,10 @@ class: func [blk [block!] "Object words and values." /local explicitMembers loca
 	; give the meta-class object a member "new" which is a function 
 	; that will instantiate a Rebol object
 
-	return object compose/deep [
+	do reduce [to-set-word className object compose/deep [
 		new: func [args [block!] /local newObject] [
 			newObject: object [
+				class: object [name: (to-string className)]
 				(implicitMembers)
 				(blk)
 			]
@@ -107,6 +108,8 @@ class: func [blk [block!] "Object words and values." /local explicitMembers loca
 			return newObject
 		]
 	]
+	]
+	none
 ]
 
 ; funny RUBOL-DEF. names here because we run a reduce on the arguments
@@ -137,7 +140,16 @@ def: func [spec [block!] body [block!]] [
 	]
 ]
 
+; Ruby has an operation called puts that calls the to_s method on the passed in
+; object explicitly.
 
+puts: func [arg] [
+	either object? arg [
+		print arg/to_s
+	] [
+		print to-string arg
+	]
+]
 
 ; Note that when you put a colon on the end of a token, it's a "set-word"
 ; (e.g. an assignment).  But when you put a colon at the *beginning*
@@ -145,10 +157,11 @@ def: func [spec [block!] body [block!]] [
 ; between the desire to call the print function vs. fetching the
 ; function object itself.
 
-; ...so you should read this as "set the puts word to what the print word is 
-; currently pointing to"
-
-puts: :print
+; so you should read...
+;
+;     foo: :bar
+;
+; ...as "set the foo word to what the bar word is currently pointing to"
 
 ; Ruby uses nil, why not define it just to reduce speed bumps...?
 
