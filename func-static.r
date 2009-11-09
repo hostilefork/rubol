@@ -206,17 +206,27 @@ func-static: func [spec [block!] statics [block!] body [block!] /resettable /loc
 
 ; Defaultible function, need to document
 
-func-default: func [spec [block!] body [block!]] [
+func-default: func [spec [block!] body [block!] /local paramInfo] [
+	; short-cut, need smarter logic to make this general
+	if empty? spec [
+		return does body
+	]
 
-	return func-static [FUNC-DEFAULT.args [block!] /local FUNC-DEFAULT.reducedArgs] [FUNC-DEFAULT.initialized: false FUNC-DEFAULT.workhorse: none FUNC-DEFAULT.paramInfo: none] compose/deep [
+	paramInfo: get-parameter-information spec
+	return func-static compose/deep [
+		FUNC-DEFAULT.args [block!]
+		/local FUNC-DEFAULT.reducedArgs
+	] [
+		FUNC-DEFAULT.initialized: false 
+		FUNC-DEFAULT.workhorse: none
+		FUNC-DEFAULT.paramInfo: [(paramInfo)]
+	] compose/deep [
 		if not FUNC-DEFAULT.initialized [
-			FUNC-DEFAULT.paramInfo: get-parameter-information [(spec)]
 			FUNC-DEFAULT.workhorse: func FUNC-DEFAULT.paramInfo/spec [(body)]
-			FUNC-DEFAULT.initialized: true
+			FUNT-DEFAULT.initialized: true
 		]
 
 		; evaluate the arguments in the caller's context
-
 		FUNC-DEFAULT.reducedArgs: reduce FUNC-DEFAULT.args
 
 		; If we reduced and didn't get enough args, add from the defaults
