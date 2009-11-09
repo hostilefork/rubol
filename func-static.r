@@ -82,7 +82,7 @@ REBOL [
 		] [
 			print rejoin ["onePlusOne * arg = " onePlusOne * arg]
 			append message " World" 
-			print rejoin ["message: " message]
+			print rejoin ["message: " message newline]
 		]
 
 		doubleAndAppend 3
@@ -119,13 +119,13 @@ get-parameter-information: func [parameters [block!] /local result expression po
 	;
 	;	[a b [block!] c: 3 + 4 d: "hello"]
 	;
-	; This analyzes that and gives you back two series.  One is the
-	; values and the other is their defaults.  So you would get in 
-	; this case
+	; This analyzes that and gives you back an object with two fields.  One is 
+	; a spec (suitable for use in a function definition) and the other is a
+	; list of defaults.  In this case the result would be:
 	;
 	; [
-	;	[a b [block!] c d]
-	; 	[none none (3 + 4) ("hello")]
+	;	spec: [a b [block!] c d]
+	; 	defaults [none none (3 + 4) ("hello")]
 	; ]
 
 	result: copy/deep [spec: [] defaults: []]

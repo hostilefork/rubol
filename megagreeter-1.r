@@ -1,6 +1,6 @@
 Rebol [
 	Title: "MegaGreeter From Ruby Language Tutorial Step #1"
-	File: %rubol-megagreeter-1.r
+	File: %megagreeter-1.r
 ]
 
 ; Include the code that makes Rebol act more like Ruby
