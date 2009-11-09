@@ -175,13 +175,13 @@ func-static: func [spec [block!] statics [block!] body [block!] /resettable /loc
 	resetPreface: either resettable [
 		compose/deep [
 			if reset [
-				FUNC-STATIC.staticCopy: [(statics)]
-				foreach elem FUNC-STATIC**staticCopy [
+				FUNC-STATIC.staticsCopy: [(statics)]
+				foreach elem FUNC-STATIC.staticsCopy [
 					if word? elem [
 						bind elem FUNC-STATIC.originalContext
 					]
 				]
-				do FUNC-STATIC.staticCopy
+				do FUNC-STATIC.staticsCopy
 			]
 		]
 	] [
@@ -190,7 +190,7 @@ func-static: func [spec [block!] statics [block!] body [block!] /resettable /loc
 
 	return do reduce compose/deep [
 		; when we reduce this we'll get a closure that produces functions if invoked
-		closure [(either resettable [[originalContext]] []) (paramInfo/spec)] [
+		closure [(either resettable [[FUNC-STATIC.originalContext]] []) (paramInfo/spec)] [
 			func [(spec) (either resettable [[/reset]] [])] [
 				(resetPreface) 
 				(body)
