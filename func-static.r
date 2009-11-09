@@ -203,3 +203,28 @@ func-static: func [spec [block!] statics [block!] body [block!] /resettable /loc
 		; ...returning the function with static members that the user wants!
 	]
 ]
+
+; Defaultible function, need to document
+
+func-default: func [spec [block!] body [block!]] [
+
+	return func-static [FUNC-DEFAULT.args [block!] /local FUNC-DEFAULT.reducedArgs] [FUNC-DEFAULT.initialized: false FUNC-DEFAULT.workhorse: none FUNC-DEFAULT.paramInfo: none] compose/deep [
+		if not FUNC-DEFAULT.initialized [
+			FUNC-DEFAULT.paramInfo: get-parameter-information [(spec)]
+			FUNC-DEFAULT.workhorse: func FUNC-DEFAULT.paramInfo/spec [(body)]
+			FUNC-DEFAULT.initialized: true
+		]
+
+		; evaluate the arguments in the caller's context
+
+		FUNC-DEFAULT.reducedArgs: reduce FUNC-DEFAULT.args
+
+		; If we reduced and didn't get enough args, add from the defaults
+
+		if lesser? length? FUNC-DEFAULT.reducedArgs length? FUNC-DEFAULT.paramInfo/defaults [
+			append FUNC-DEFAULT.reducedArgs compose skip tail FUNC-DEFAULT.paramInfo/defaults subtract length? FUNC-DEFAULT.reducedArgs length? FUNC-DEFAULT.paramInfo/defaults
+		]
+
+		return do append copy [FUNC-DEFAULT.workhorse] FUNC-DEFAULT.reducedArgs
+	]
+]

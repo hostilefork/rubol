@@ -1,4 +1,4 @@
-REBOL [
+Rebol [
     Title: "Rubol"
     Purpose: "Extensions to Rebol to make it more Ruby-like"
     Description: { This was a thought experiment about how to ease a 
@@ -17,7 +17,7 @@ REBOL [
 	have a little bit less to absorb if they are going to try
 	experimenting with Rebol
 
-	!!!WARNING - This is a one-day hack that I'm just trying to
+	!!!WARNING - This is so far a one-day hack that I'm just trying to
 	put out for people to look at.  It might be a good tool
 	and people might respond well to it.  At least it could
 	focus certain conversations.!!!
@@ -49,7 +49,76 @@ REBOL [
 
 do %func-static.r
 
-class: func ['className blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName] [
+class: func ['className blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName defRule] [
+
+	; Everywhere they say
+	;	def x [spec] [body] 
+	; what we really want to do is
+	; 	func-default [spec] [body]
+	
+	; REVIEW: We could also look everywhere that they say
+	;	def x [body]
+	; followed by something that isn't a block and substitute with 
+	;	x: does [body]
+	; but I don't think that sets a very good educational precedent.  Better to
+	; evangelize the idea of things being consistent in knowing their number of
+	; arguments... more Rebol-y and less dialect-y.
+
+	; Also everywhere they say
+	;	attr_accessor .foo
+	; we want to change this into
+	;	foo: object [set: ... get: ...]
+	; there's also a variant that will do this for several attributes
+	; 	attr_accessor [.foo .bar .baz]
+
+	; The parse dialect can handle this although I thought there was a more elegant
+	; form of change.  It apparently isn't working...
+	;
+	; 	http://curecode.org/rebol3/ticket.rsp?id=1279&cursor=11
+	;
+	; Also the details of how to get it work in one pass are bogging me down so I will
+	; leave that to someone else for now.
+
+	defRule: [
+		any [
+			to [quote def] replaceStart: 
+			skip [word!] replaceEnd: (
+				replaceArg: first back replaceEnd 
+				replaceEnd: change/part replaceStart compose [
+					(to-set-word replaceArg) func-default 
+				] replaceEnd
+			) :replaceEnd
+		] to end
+	]
+
+	attr_accessorRule: [
+		any [
+			to [quote attr_accessor] replaceStart: 
+			skip [word! | block!] replaceEnd: (
+				replaceArg: first back replaceEnd
+				if word? replaceArg [
+					replaceArg: to-block replaceArg
+				]
+				replaceWith: copy []
+				foreach attributeRef replaceArg [
+					append replaceWith compose/deep [
+						(to-set-word next to-string attributeRef) object [
+							set: func [value] [(to-set-word attributeRef) value]
+							get: func [] [to-get-word (attributeRef)]
+						]
+					]
+				]
+				replaceEnd: change/part replaceStart replaceWith replaceEnd 
+			) :replaceEnd
+		] to end
+	]
+
+	use [replaceStart replaceEnd replaceArg replaceWith] [
+		; REVIEW: throw if this does not succeed?
+		; TODO: unify so it's one parse pass?
+		parse blk defRule
+		parse blk attr_accessorRule
+	]
 
 	; collect the set-words at the first level of the spec
 	; these are the member functions and declared members
@@ -76,24 +145,6 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 		]
 	]
 
-	; look for patterns like 
-	; 	[attr_accessor .names]
-	; and replace with a definition for names as a member of the 
-	; object which has get and set functions
-
-	accessor: head blk
-	while [found? accessor: find accessor 'attr_accessor] [
-		attribute: take next accessor
-		attributeName: next to-string attribute
-		poke accessor 1 to-set-word attributeName
-		accessor: insert next accessor compose/deep [
-			object [
-				set: func [value] [(to-set-word attribute) value]
-				get: func [] [to-get-word (attribute)]
-			]
-		]
-	]
-
 	; give the meta-class object a member "new" which is a function 
 	; that will instantiate a Rebol object
 
@@ -110,34 +161,6 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 	]
 	]
 	none
-]
-
-; funny RUBOL-DEF. names here because we run a reduce on the arguments
-; In general we'll have the same evaluative context as the caller
-; but there will be these little extra words.  Trying to make
-; sure they won't collide... maybe there's a better way
-
-def: func [spec [block!] body [block!]] [
-
-	return func-static [RUBOL-DEF.args [block!] /local RUBOL-DEF.reducedArgs] [RUBOL-DEF.initialized: false RUBOL-DEF.workhorse: none RUBOL-DEF.paramInfo: none] compose/deep [
-		if not RUBOL-DEF.initialized [
-			RUBOL-DEF.paramInfo: get-parameter-information [(spec)]
-			RUBOL-DEF.workhorse: func RUBOL-DEF.paramInfo/spec [(body)]
-			RUBOL-DEF.initialized: true
-		]
-
-		; evaluate the arguments in the caller's context
-
-		RUBOL-DEF.reducedArgs: reduce RUBOL-DEF.args
-
-		; If we reduced and didn't get enough args, add from the defaults
-
-		if lesser? length? RUBOL-DEF.reducedArgs length? RUBOL-DEF.paramInfo/defaults [
-			append RUBOL-DEF.reducedArgs compose skip tail RUBOL-DEF.paramInfo/defaults subtract length? RUBOL-DEF.reducedArgs length? RUBOL-DEF.paramInfo/defaults
-		]
-
-		return do append copy [RUBOL-DEF.workhorse] RUBOL-DEF.reducedArgs
-	]
 ]
 
 ; Ruby has an operation called puts that calls the to_s method on the passed in

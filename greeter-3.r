@@ -1,9 +1,10 @@
 Rebol [
 	Title: "Greeter Ported From Ruby Step #3"
-	Description: {Learning Rebol's compose is a very general way
-	of doing a lot of tricks that are like Ruby's ability to embed
-	expressions into strings.  But there are lots of shortcuts if
-	you are in-the-know.
+	Description: {Rather than try and mimic Ruby's #{@variable}
+	notation for embedding variables into strings, I went straight to
+	using "compose".  Compose is a very powerful tool and it's good
+	for you to know about it sooner rather than later.  However, it
+	was actually a bit heavy-handed for this case.
 
 	There's an operation called "rejoin" in Rebol that is short for
 	"reduce and join together".  Reduce is a way of invoking the
@@ -30,20 +31,14 @@ Rebol [
 
 	With rejoin we can take for granted the fact that it produces a
 	string, and we can avoid using the parentheses.  Because we know no
-	call to a to-string is needed, we can use Rebol's native print
+	call of to-string is needed, we can use Rebol's native print
 	function:
 
 		print rejoin ["Hi " .name "!"]
 
-	That's a little purer.  But Rebol has some other nice tricks up its sleeve.
-	To name one that I think helps readability, there are english words
-	defined for for the space, tab, lf, cr, and null characters.  So long 
-	as you're doing a "reduce" with your "join" these words will be reduced 
-	to those strings:
-
-		print rejoin ["Hi" space .name "!"]
-
-	This Step 3 transformation does that upgrade.
+	That's how most Rebol programmers would think about this kind of problem.
+	You'll notice that this pattern is used a lot more than building long
+	chains of concatenations using plus signs.
 	}
 
     	File: %greeter-3.r
@@ -53,14 +48,14 @@ Rebol [
 do %rubol.r
 
 class Greeter [
-	initialize: def [name: "World"] [
+	def initialize [name: "World"] [
 		.name: name
 	]
 	say_hi: does [
-		print rejoin  ["Hi" space .name "!"]
+		print rejoin ["Hi " .name "!"]
 	]
 	say_bye: does [
-		print rejoin ["Bye" space .name "," space "come back soon."]
+		print rejoin ["Bye " .name ", come back soon."]
 	]
 ]
 

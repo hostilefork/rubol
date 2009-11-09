@@ -1,21 +1,43 @@
 Rebol [
 	Title: "MegaGreeter From Ruby Language Tutorial Step #1"
 	File: %megagreeter-1.r
+
+	Usage: {Fire up a Rebol interpreter in the directory where these files
+        are located.  Then at the command line, type:
+
+                do %megagreeter-1.r
+
+        When it runs, you should get the output:
+
+		Hello World!
+		Goodbye World.  Come back soon!
+		Hello Zeke!
+		Goodbye Zeke.  Come back soon!
+		Hello Albert!
+		Hello Brenda!
+		Hello Charles!
+		Hello Dave!
+		Hello Englebert!
+		Goodbye Albert, Brenda, Charles, Dave, Englebert.  Come back soon!
+		...
+		...
+
+	}
 ]
 
 ; Include the code that makes Rebol act more like Ruby
 do %rubol.r
 
-MegaGreeter: class [
+class MegaGreeter [
 	attr_accessor .names
 
 	; Create the object
-	initialize: def [names: "World"] [
+	def initialize [names: "World"] [
 		.names: names
 	]
 
 	; Say hi to everybody
-	say_hi: def [] [
+	def say_hi [] [
 		either nil? .names [
 			puts "..."
 		] [
@@ -31,7 +53,7 @@ MegaGreeter: class [
 	]
 
 	; Say bye to everybody
-	say_bye: def [] [
+	def say_bye [] [
 		either nil? .names [
 			puts "..."
 		] [

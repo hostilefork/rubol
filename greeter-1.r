@@ -27,13 +27,13 @@ Rebol [
 do %rubol.r
 
 class Greeter [
-	initialize: def [name: "World"] [
+	def initialize [name: "World"] [
 		.name: name
 	]
-	say_hi: def [] [
+	def say_hi [] [
 		puts compose ["Hi " (.name) "!"]
 	]
-	say_bye: def [] [
+	def say_bye [] [
 		puts compose ["Bye " (.name) ", come back soon."]
 	]
 ]
