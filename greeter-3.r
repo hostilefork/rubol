@@ -51,10 +51,10 @@ class Greeter [
 	def initialize [name: "World"] [
 		.name: name
 	]
-	say_hi: does [
+	def say_hi nil [
 		print rejoin ["Hi " .name "!"]
 	]
-	say_bye: does [
+	def say_bye nil [
 		print rejoin ["Bye " .name ", come back soon."]
 	]
 ]

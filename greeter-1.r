@@ -1,6 +1,6 @@
 Rebol [
 	Title: "Greeter Ported From Ruby Step #1"
-	Description: {This is one of the most basic rote transformations of the code 
+	Description: {This is a simple rote transformation of the code 
 	for the Greeter in the Ruby quickstart tutorial into "Rubol" (e.g. something
 	that has been brought in line with the required consistency that Rebol can 
 	parse, run, and reflect):
@@ -40,5 +40,5 @@ class Greeter [
 
 g: Greeter/new ["Pat"]
 
-g/say_hi
-g/say_bye
+g/say_hi []
+g/say_bye []

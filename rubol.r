@@ -49,21 +49,62 @@ Rebol [
 
 do %func-static.r
 
+; funct-def implements a variant of funct where you can put expressions in the spec and 
+; they will be handled as defaults.  This feature requires a departure from Rebol's policy
+; of knowing the expected number of parameters in advance, and callers must pass in a block.
+
+; if you want a caller to not require a block at the call site, you explicitly use none
+; as the specDef
+
+funct-def: func [specDef [block! none!] body [block!] /with withObject /local paramInfo functSpec] [
+
+	if none? specDef [
+		either with [
+			return funct/with [] body withObject
+		] [
+			return funct [] body
+		]
+	]
+
+	paramInfo: get-parameter-information specDef
+	functSpec: compose/deep [funct-static [
+			FUNCT-DEF.args [block!]
+		] [
+			FUNCT-DEF.defaults: [(paramInfo/defaults)]
+			FUNCT-DEF.main: (either with [[funct/with]] [[funct]]) [(paramInfo/spec)] [(body)] (either with [[withObject]] [[]]) 
+		] [
+			; evaluate the arguments in the caller's context
+			FUNCT-DEF.mainArgs: reduce FUNCT-DEF.args
+
+			; If we reduced and didn't get enough args, add from the defaults
+			if lesser? length? FUNCT-DEF.mainArgs length? FUNCT-DEF.defaults [
+				append FUNCT-DEF.mainArgs compose skip tail FUNCT-DEF.defaults subtract length? FUNCT-DEF.mainArgs length? FUNCT-DEF.defaults
+			]
+
+			;print "Calling funct-def.main with arguments"
+			;probe FUNCT-DEF.mainArgs
+
+			return do append to-block 'FUNCT-DEF.main FUNCT-DEF.mainArgs 
+		] 
+	]
+
+	;print "Function specification for funct-def translated into funct-static"
+	;probe functSpec
+	;print newline
+
+	return do functSpec
+]
+
 class: func ['className blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName defRule] [
 
 	; Everywhere they say
 	;	def x [spec] [body] 
 	; what we really want to do is
-	; 	func-default [spec] [body]
+	; 	funct-def/with [spec] [body] self
+	; although if Rebol would implement "method" as a way of automatically capturing self, 
+	; this could be reduced to:
+	;	method-def [spec] [body]
 	
-	; REVIEW: We could also look everywhere that they say
-	;	def x [body]
-	; followed by something that isn't a block and substitute with 
-	;	x: does [body]
-	; but I don't think that sets a very good educational precedent.  Better to
-	; evangelize the idea of things being consistent in knowing their number of
-	; arguments... more Rebol-y and less dialect-y.
-
 	; Also everywhere they say
 	;	attr_accessor .foo
 	; we want to change this into
@@ -77,19 +118,26 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 	; 	http://curecode.org/rebol3/ticket.rsp?id=1279&cursor=11
 	;
 	; Also the details of how to get it work in one pass are bogging me down so I will
-	; leave that to someone else for now.
+	; leave that to someone else for now, this should all be possible more
+	; elegantly.
 
 	defRule: [
 		any [
 			to [quote def] replaceStart: 
-			skip [word!] replaceEnd: (
-				replaceArg: first back replaceEnd 
-				replaceEnd: change/part replaceStart compose [
-					(to-set-word replaceArg) func-default 
-				] replaceEnd
+			4 skip replaceEnd: (
+				use [name spec body] [
+					body: first back replaceEnd 
+					spec: first back back replaceEnd
+					name: first back back back replaceEnd
+					replaceEnd: change/part replaceStart compose/deep/only [
+						(to-set-word name) funct-def/with (spec) (body) self
+					] replaceEnd
+				]
 			) :replaceEnd
 		] to end
 	]
+
+	protectAccessors: copy []
 
 	attr_accessorRule: [
 		any [
@@ -101,10 +149,15 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 				]
 				replaceWith: copy []
 				foreach attributeRef replaceArg [
-					append replaceWith compose/deep [
-						(to-set-word next to-string attributeRef) object [
-							set: func [value] [(to-set-word attributeRef) value]
-							get: func [] [to-get-word (attributeRef)]
+					use [attributeWithoutDot] [
+						attributeNameWithoutDot: next to-string attributeRef
+						append protectAccessors 'protect
+						append protectAccessors to-lit-word attributeNameWithoutDot
+						append replaceWith compose/deep [
+							(to-set-word attributeNameWithoutDot) object [
+								set: func [value] [(to-set-word attributeRef) value]
+								get: func [] [(attributeRef)]
+							]
 						]
 					]
 				]
@@ -154,7 +207,11 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 				class: object [name: (to-string className)]
 				(implicitMembers)
 				(blk)
+				(protectAccessors)
 			]
+
+			; probe newObject
+
 			newObject/initialize args
 			return newObject
 		]

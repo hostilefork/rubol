@@ -1,33 +1,67 @@
 Rebol [
 	Title: "Greeter Ported From Ruby Step #2"
-	Description: {One thing that is grating about the first crack at
-	the Greeter is the appearance of empty parameter lists.  In the
-	original Ruby, def was flexible and sensed when there were
-	parentheses and when there were not.
+	Description: {One thing that Ruby programmers might find grating
+	about the first crack at the Greeter conversion is the appearance 
+	of empty parameter lists--both at the definition site of methods
+	and at the call site.  Ruby allows you to omit those.
 
-	I deliberately left out additional syntax tokens to make this
-	distinction in Rubol (even though I could have) because the goal
-	is to showcase how Rebol deals with these issues.  In the case
-	of functions that take arguments, you simply have different
-	words for defining them.
+	Rebol has much more of a "one size fits all" attitude in parsing.
+	This provides benefits similar to what you get by structuring
+	information in a standard format like XML.  Though it's even
+	more like JSON.  Which is appropriate, because it was one of
+	the languages that inspired JSON's approach!  You can *reflect*
+	the source code within the Rebol language, and that's really 
+	powerful.
 
-	So although there are generic tools for defining functions:
-	
-		sum: functor [a b] [a + b]
-		say-hello: functor [] [print "Hello"]
+	On the other hand, Ruby has a diverse array of parser cues.  For
+	instance:
 
-	There's also special shorthand you can use:
+		def initialize(name = "World")
+			@name = name
+		end
+		def say_hi
+			puts "Hi #{@name}!"
+		end
 
-		say-goodbye: does [print "Hello"]
+	It's easy for Ruby to tell the difference between a method
+	taking no parameters and one taking several.  there is a "def"/"end"
+	bounding block for the method bodies and bounding parentheses for
+	the parameters.
 
-	You also see that Rebol's preferred way of declaring variables,
-	members, or assigning pretty much anything is to put the name first
-	and then a colon.  As you see with what I was able to do in making "class"
-	and "def" it's not the only way to get the job done when you're defining
-	an abstraction.  It's just the *preferred* way.
+	You might think that Rebol should count how many blocks there 
+	are after a def and make a decision on whether the block
+	represents a call with no parameters:
 
-	As you can see, this small change cleans up the extra braces on both
-	the callsites and the method declarations.
+		def initialize [name: "World"] [
+			.name: name
+		]
+		def say_hi [
+			puts compose ["Hi " (.name) "!"]
+		]
+
+	It would technically be possible for some enclosing context (such
+	as "class") to detect this pattern and "under the hood" rewrite
+	such situations.  But def itself, executing outside of any context,
+	must have a fixed notion of its parameters.
+
+	Since the goal of Rubol is to build a Ruby-like implementation
+	which is compatible with Rebol concepts, I've avoided doing any
+	such tricks.  But there's a compromise: you're able to specify
+	nil as the parameters argument to indicate that you don't want
+	to have to supply an empty list of arguments at the callsite.
+
+	To me, the effect on callers is more important--as there is only
+	one definition, but a potentially infinite number of callers.  So
+	you'll see that issue cleaned up below.
+
+	(Note: Though parentheses around this nil are not strictly necessary,
+	you can use them if you feel it makes the code more readable.
+	It's just serving the purpose of doing precedence and will be
+	disposed by the evaluator.  I'll put them in this example but
+	leave them off in future ones, because they're not really
+	serving a practical purpose and might confuse people who don't
+	realize that they really aren't the same as the brackets you
+	use when you want a parameter list.)
 	}
 
     	File: %greeter-2.r
@@ -40,10 +74,10 @@ class Greeter [
 	def initialize [name: "World"] [
 		.name: name
 	]
-	say_hi: does [
+	def say_hi (nil) [
 		puts compose ["Hi " (.name) "!"]
 	]
-	say_bye: does [
+	def say_bye (nil) [
 		puts compose ["Bye " (.name) ", come back soon."]
 	]
 ]

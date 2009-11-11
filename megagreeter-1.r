@@ -21,7 +21,6 @@ Rebol [
 		Goodbye Albert, Brenda, Charles, Dave, Englebert.  Come back soon!
 		...
 		...
-
 	}
 ]
 

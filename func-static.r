@@ -1,21 +1,30 @@
 REBOL [
 	Title: "Rebol Functions with Static Locals"
+
 	Purpose: "Easy-to-use alternative to closure for static local variables"
+
 	Description: {Rebol 3 introduced closures as a native feature of the
-	language.  However, working with the 2-step process and returning functions
-	from within a closure can be a bit overwhelming.
+	language and shows examples of using them to declare functions which 
+	capture and retain state between function calls.  However, working with
+	the 2-step process and having to think in terms of returning functions
+	from within a closure can be overwhelming.
 
 	This defines func-static, which is for people who just want a function to
-	accumulate state of its own but not pollute the parent context.
+	accumulate state of its own but not pollute the parent context.  As a
+	further feature to test out, it can automatically provide a reset 
+	refinement for resetting the static locals to the expressions that
+	were used to initialize them.
+
+	I've also added something called "funct-def" as a helper for Ruby
+	interoperability which can accept defaults.  It may be useful in its
+	own right, although it does diverge from Rebol's model of every
+	function callsite having the argument count in advance.
 
 	!!!WARNING: This is very experimental right now and I would like some
 	people with more experience writing these sorts of things to give it
 	a look.  It needs error handling and a lot of other things.  (Also there 
-	should be variants for the different function types and not just func)!!!
-
-	As a further feature to test out, it can automatically provide a reset 
-	refinement for resetting the static locals to the expressions that
-	were used to initialize them
+	should be variants for the different function types and not just func)
+	Locals are not being handled in proper "funct" form yet!!!
 	}
 
 	Author: "Hostile Fork"
@@ -113,19 +122,19 @@ REBOL [
     ]
 ]
 
-
 get-parameter-information: func [parameters [block!] /local result expression pos] [
+
 	; Imagine you have something like:
 	;
 	;	[a b [block!] c: 3 + 4 d: "hello"]
 	;
-	; This analyzes that and gives you back an object with two fields.  One is 
+	; This routine analyzes that and gives you back an object with two fields.  One is 
 	; a spec (suitable for use in a function definition) and the other is a
 	; list of defaults.  In this case the result would be:
 	;
 	; [
 	;	spec: [a b [block!] c d]
-	; 	defaults [none none (3 + 4) ("hello")]
+	; 	defaults: [none none (3 + 4) ("hello")]
 	; ]
 
 	result: copy/deep [spec: [] defaults: []]
@@ -137,9 +146,9 @@ get-parameter-information: func [parameters [block!] /local result expression po
 			; list members up until the next set-word
 
 			expression: to-paren []
-			append result/spec to-word first pos
+			append/only result/spec to-word first pos
 			while [(not tail? next pos) and (not set-word? second pos)] [
-				append expression second pos
+				append/only expression second pos
 				pos: next pos
 			]
 			append/only result/defaults expression
@@ -148,9 +157,9 @@ get-parameter-information: func [parameters [block!] /local result expression po
 			; If we see an unadorned word value then also put "none" in the 
 			; defaults list
 
-			append result/spec first pos
+			append/only result/spec first pos
 			if word? first pos [
-				append result/defaults none
+				append/only result/defaults none
 			]
 
 			; TODO think about refinements.  They are not really compatible with
@@ -162,79 +171,78 @@ get-parameter-information: func [parameters [block!] /local result expression po
 	return result
 ]
 
-func-static: func [spec [block!] statics [block!] body [block!] /resettable /local paramInfo resetPreface originalContext] [
-	paramInfo: get-parameter-information statics
+funct-static: func [spec [block!] statics [block!] body [block!] /with withObject /resettable /local objSpec staticsInfo] [
+
+	; We are going to make an object which initializes some local members to look
+	; just like the statics parameter
+
+	objSpec: copy statics
+
+	; There is some overhead to resetting, because we have to save a copy of the
+	; initial statics specification.  We don't pay for this by default and disable
+	; the reset refinement, but if the user wants it then it is there
 
 	if resettable [
-		; bind a throwaway word in the caller's context so we can hang onto that context
-		FUNC-STATIC.dummy: none
-		originalContext: bind? 'FUNC-STATIC.dummy
-		unset 'FUNC-STATIC.dummy
+		append objSpec compose/deep [
+			FUNC-STATIC.reset: func [] [
+				do [(statics)]
+			]
+		]
 	]
 
-	resetPreface: either resettable [
-		compose/deep [
-			if reset [
-				FUNC-STATIC.staticsCopy: [(statics)]
-				foreach elem FUNC-STATIC.staticsCopy [
-					if word? elem [
-						bind elem FUNC-STATIC.originalContext
-					]
+	; We return a generated function which is actually going to be a member in
+	; an object... the object where the static state is stored.
+
+	staticsInfo: get-parameter-information statics
+
+	append objSpec compose/deep [
+
+		; The main funct is NOT a bound to the object that contains the statics
+		; which we are declaring here.  It defaults to the caller's notion of
+		; context, or the caller-specified "with" context.
+		; so we must explicitly pass the statics as parameters
+
+		FUNC-STATIC.main: (either with [[funct/with]] [[funct]]) [(spec) (staticsInfo/spec)] [
+			(body)
+		] (either with [[withObject]] [[]]) 
+
+		; Unlike the main funct, the run function *IS* bound inside the object
+		; we are declaring.  Thus it can read the statics long enough to proxy
+		; them as parameters to the main, which runs in the context desired by
+		; the caller at the point of definition.
+
+ 		FUNC-STATIC.run: funct/with [(spec) (either resettable [[/reset]] [[]])] [
+			(either resettable [
+				[if reset [FUNC-STATIC.reset]]
+			] [[]])
+			FUNCT-STATIC.mainArgs: copy [(staticsInfo/spec)]
+
+			; This is a bit tricky.  If one declares a static member that is a
+			; function assignment, you can't simply use the word you assigned
+			; that function to as a parameter to main because it will try to
+			; call the function.  Here's the temporary solution: turn any
+			; words into get words, probably something better...
+
+			FUNCT-STATIC.argIterator: FUNCT-STATIC.mainArgs
+			while [not tail? FUNCT-STATIC.argIterator] [
+				if word? first FUNCT-STATIC.argIterator [
+					change FUNCT-STATIC.argIterator to-get-word first FUNCT-STATIC.argIterator
 				]
-				do FUNC-STATIC.staticsCopy
+				FUNCT-STATIC.argIterator: next FUNCT-STATIC.argIterator
 			]
-		]
-	] [
-		[]
+
+			insert FUNCT-STATIC.mainArgs [(collect-words spec)] 
+
+			;print "Calling funct-static.main with arguments"
+			;probe FUNCT-STATIC.mainArgs
+
+			return do append to-block 'FUNC-STATIC.main FUNCT-STATIC.mainArgs
+		] self
 	]
 
-	return do reduce compose/deep [
-		; when we reduce this we'll get a closure that produces functions if invoked
-		closure [(either resettable [[FUNC-STATIC.originalContext]] []) (paramInfo/spec)] [
-			func [(spec) (either resettable [[/reset]] [])] [
-				(resetPreface) 
-				(body)
-			]
-		]
+	;print "Object specification for funct-static"
+	;probe objSpec
+	;print newline
 
-		; ...and then these arguments will be passed to invoke it...
-		(either resettable [originalContext] [[]]) (paramInfo/defaults)
-
-		; ...returning the function with static members that the user wants!
-	]
-]
-
-; Defaultible function, need to document
-
-func-default: func [spec [block!] body [block!] /local paramInfo] [
-	; short-cut, need smarter logic to make this general
-	if empty? spec [
-		return does body
-	]
-
-	paramInfo: get-parameter-information spec
-	return func-static compose/deep [
-		FUNC-DEFAULT.args [block!]
-		/local FUNC-DEFAULT.reducedArgs
-	] [
-		FUNC-DEFAULT.initialized: false 
-		FUNC-DEFAULT.workhorse: none
-		FUNC-DEFAULT.paramInfo: [(paramInfo)]
-	] compose/deep [
-		if not FUNC-DEFAULT.initialized [
-			FUNC-DEFAULT.workhorse: func FUNC-DEFAULT.paramInfo/spec [(body)]
-			FUNT-DEFAULT.initialized: true
-		]
-
-		; evaluate the arguments in the caller's context
-		FUNC-DEFAULT.reducedArgs: reduce FUNC-DEFAULT.args
-
-		; If we reduced and didn't get enough args, add from the defaults
-
-		if lesser? length? FUNC-DEFAULT.reducedArgs length? FUNC-DEFAULT.paramInfo/defaults [
-			append FUNC-DEFAULT.reducedArgs compose skip tail FUNC-DEFAULT.paramInfo/defaults subtract length? FUNC-DEFAULT.reducedArgs length? FUNC-DEFAULT.paramInfo/defaults
-		]
-
-		return do append copy [FUNC-DEFAULT.workhorse] FUNC-DEFAULT.reducedArgs
-	]
+	return select make object! objSpec 'FUNC-STATIC.run
 ]

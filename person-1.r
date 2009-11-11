@@ -22,7 +22,7 @@ class Person [
 		.lname: lname
 	]
  
-	def to_s [] [
+	def to_s (nil) [
 		to-string compose [(.lname) ", " (.fname)]
 	]
  
