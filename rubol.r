@@ -106,12 +106,13 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 	paramInfo: get-parameter-information specDef
 	functSpec: compose/deep [funct-static [
 			FUNCT-DEF.args [block!]
-			(either yieldable [[FUNCT-DEF.yielder [function!]]] [[]])
+			(either yieldable [[FUNCT-DEF.yielder [function! block!]]] [[]])
 		] [
 			FUNCT-DEF.defaults: [(paramInfo/defaults)]
 			FUNCT-DEF.main: (either with [[funct/with]] [[funct]]) [
-				(paramInfo/spec) (either yieldable [[FUNCT-DEF.yielder [function!]]] [[]])
+				(paramInfo/spec) (either yieldable [[FUNCT-DEF.yielder [function! block!]]] [[]])
 			] [
+				(either yieldable [[if block? :FUNCT-DEF.yielder [FUNCT-DEF.yielder: ruby-block FUNCT-DEF.yielder]]] [[]])
 				(body)
 			] (either with [[withObject]] [[]]) 
 		] [
@@ -127,9 +128,9 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 		] 
 	]
 
-	; print "Function specification for funct-def translated into funct-static"
-	; probe functSpec
-	; print newline
+	;print "Function specification for funct-def translated into funct-static"
+	;probe functSpec
+	;print newline
 
 	return do functSpec
 ]
@@ -427,6 +428,40 @@ ruby-join: func [iterable [series!] separator /local pos] [
 
 ruby-do: :does
 
+
+; Ruby's notion of a "code block" is a fast way to write functions, but really
+; equivalent to a more verbose form.
+;
+;    { |last,first| print "employee ",": ",first, " ",last}
+;
+; That's really no different from:
+;
+;    def (last, first) print "employee",": ",first," ", last end
+;
+; There is some contention among Ruby programmers as to when to use this
+; abbreviated notation.  But as with other things in Rubol, our job is not
+; to question why they like this -- just to show that it can be captured in
+; spirit without too much trouble.  The way to make such a function
+; in Rubol is:
+;
+;    ruby-block [ [last first] ... ]
+;
+; If the first element is a block, it is assumed to be the spec block.  If you
+; actually want the first piece of your code to be a block, then make sure to
+; include an empty block at the start.
+;
+; (Code in the ... obviously will be a little different)
+
+ruby-block: func [code [block!]] [
+	if empty? code [
+		return make-def [] []
+	]
+	either block? first code [
+		return make-def first code copy next code
+	] [
+		return make-def [] code
+	]
+]
 
 
 ; Ruby's "times" is repeat only it takes functions made with do and not
