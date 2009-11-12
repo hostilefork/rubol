@@ -11,7 +11,7 @@ Rebol [
 	Home: http://hostilefork.com/
 	License: mit
 	
-	File: %method-proposal.r
+	File: %scope-test.r
 	Date: 10-Nov-2009
 	Version: 0.1.1
 ]
@@ -30,8 +30,8 @@ class ScopeTest [
 	attr_accessor [.x .y]
 
 	def initialize (nil) [
-		.x: "member init X"
-		.y: "member init Y"
+		.x: "member init .X"
+		.y: "member init .Y"
 	]
 
 	def set_XYZ [y] [
@@ -91,7 +91,7 @@ comment [{
 	B: [[x = unset!] [y = "global assign Y"] [z = "global assign Z"]]
 	C: [[(test/x/get) = *exception*] [(test/y/get) = *exception*] [(test/z/get) = *exception*]]
 	D: [[x = unset!] [y = "global assign Y"] [z = "global assign Z"]]
-	E: [[.x = "member init X"] [.y = "member init Y"] [.z = none]]
+	E: [[.x = "member init .X"] [.y = "member init .Y"] [.z = none]]
 	F: [[.x = "set_XYZ assign .X"] [.y = "param to set_XYZ[y]"] [.z = "set_XYZ assign .Z"]]
 	G: [[x = unset!] [y = "global assign Y"] [z = "global assign Z"]]
 	H: [[(test/x/get) = "set_XYZ assign .X"] [(test/y/get) = "param to set_XYZ[y]"] [(test/z/get) = *exception*]]
