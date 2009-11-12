@@ -58,7 +58,7 @@ REBOL [
 		>> printAndCount "Goodbye" 
 		Goodbye
 		(numCalls: 2)
-
+››
 	Additionally, if you would like to be able to make a call reset the static
 	variables, use the resettable refinement.
 
@@ -184,7 +184,7 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 
 	if resettable [
 		append objSpec compose/deep [
-			FUNC-STATIC.reset: func [] [
+			FUNCT-STATIC.reset: func [] [
 				do [(statics)]
 			]
 		]
@@ -202,7 +202,7 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 		; context, or the caller-specified "with" context.
 		; so we must explicitly pass the statics as parameters
 
-		FUNC-STATIC.main: (either with [[funct/with]] [[funct]]) [(spec) (staticsInfo/spec)] [
+		FUNCT-STATIC.main: (either with [[funct/with]] [[funct]]) [(spec) (staticsInfo/spec)] [
 			(body)
 		] (either with [[withObject]] [[]]) 
 
@@ -211,11 +211,12 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 		; them as parameters to the main, which runs in the context desired by
 		; the caller at the point of definition.
 
- 		FUNC-STATIC.run: funct/with [(spec) (either resettable [[/reset]] [[]])] [
+ 		FUNCT-STATIC.run: funct/with [(spec) (either resettable [[/reset]] [[]])] [
 			(either resettable [
-				[if reset [FUNC-STATIC.reset]]
+				[if reset [FUNCT-STATIC.reset]]
 			] [[]])
-			FUNCT-STATIC.mainArgs: copy [(staticsInfo/spec)]
+
+			FUNCT-STATIC.mainArgs: copy [(collect-words spec) (staticsInfo/spec)]
 
 			; This is a bit tricky.  If one declares a static member that is a
 			; function assignment, you can't simply use the word you assigned
@@ -231,12 +232,9 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 				FUNCT-STATIC.argIterator: next FUNCT-STATIC.argIterator
 			]
 
-			insert FUNCT-STATIC.mainArgs [(collect-words spec)] 
+			;insert FUNCT-STATIC.mainArgs [(collect-words spec)] 
 
-			;print "Calling funct-static.main with arguments"
-			;probe FUNCT-STATIC.mainArgs
-
-			return do append to-block 'FUNC-STATIC.main FUNCT-STATIC.mainArgs
+			return do append to-block 'FUNCT-STATIC.main FUNCT-STATIC.mainArgs
 		] self
 	]
 
@@ -244,5 +242,5 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 	;probe objSpec
 	;print newline
 
-	return select make object! objSpec 'FUNC-STATIC.run
+	return select make object! objSpec 'FUNCT-STATIC.run
 ]

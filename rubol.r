@@ -56,22 +56,64 @@ do %func-static.r
 ; if you want a caller to not require a block at the call site, you explicitly use none
 ; as the specDef
 
-funct-def: func [specDef [block! none!] body [block!] /with withObject /local paramInfo functSpec] [
-
-	if none? specDef [
-		either with [
-			return funct/with [] body withObject
+find-callback: func [
+	"Callback on each instance of a found item, has /deep refinement, can parse do this easily?"
+	haystack [block!] "Block to search."
+	needle [any-type!] "Element to search for."
+	callback [function!] "Function to call on each find, takes series position"
+	/deep "Should recurse into blocks?"
+	/local pos thing foundAny
+][
+	foundAny: false
+	pos: haystack
+	while [not tail? pos] [
+		thing: first pos
+		either block? thing [
+			if deep [
+				foundAny: foundAny or find-callback/deep thing needle :callback
+			]
+			; what if needle is a block?  currently ignored, always fails
 		] [
-			return funct [] body
+			if thing = needle [ 
+				callback pos
+				foundAny: true
+			]
+		]
+		pos: next pos
+  	]
+	return foundAny
+]
+
+
+funct-def: func [specDef [block! none!] body [block!] /with withObject /local paramInfo functSpec pos yieldable] [
+
+	; look for uses of yield in body
+	; seems to be no find/deep
+	; http://www.mail-archive.com/rebol-list@rebol.com/msg04728.html
+
+	yieldable: find-callback/deep body 'yield func [pos] [
+		change/part pos [FUNCT-DEF.yielder reduce] 1
+	]
+
+	if none? specDef compose/deep [
+		either with [
+			return funct/with [(either yieldable [[yield]] [[]])] body withObject
+		] [
+			return funct [(either yieldable [[yield]] [[]])] body
 		]
 	]
 
 	paramInfo: get-parameter-information specDef
 	functSpec: compose/deep [funct-static [
 			FUNCT-DEF.args [block!]
+			(either yieldable [[FUNCT-DEF.yielder [function!]]] [[]])
 		] [
 			FUNCT-DEF.defaults: [(paramInfo/defaults)]
-			FUNCT-DEF.main: (either with [[funct/with]] [[funct]]) [(paramInfo/spec)] [(body)] (either with [[withObject]] [[]]) 
+			FUNCT-DEF.main: (either with [[funct/with]] [[funct]]) [
+				(paramInfo/spec) (either yieldable [[FUNCT-DEF.yielder [function!]]] [[]])
+			] [
+				(body)
+			] (either with [[withObject]] [[]]) 
 		] [
 			; evaluate the arguments in the caller's context
 			FUNCT-DEF.mainArgs: reduce FUNCT-DEF.args
@@ -81,21 +123,26 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 				append FUNCT-DEF.mainArgs compose skip tail FUNCT-DEF.defaults subtract length? FUNCT-DEF.mainArgs length? FUNCT-DEF.defaults
 			]
 
-			;print "Calling funct-def.main with arguments"
-			;probe FUNCT-DEF.mainArgs
-
-			return do append to-block 'FUNCT-DEF.main FUNCT-DEF.mainArgs 
+			return do append append to-block 'FUNCT-DEF.main FUNCT-DEF.mainArgs [(either yieldable [[:FUNCT-DEF.yielder]] [[]])]
 		] 
 	]
 
-	;print "Function specification for funct-def translated into funct-static"
-	;probe functSpec
-	;print newline
+	; print "Function specification for funct-def translated into funct-static"
+	; probe functSpec
+	; print newline
 
 	return do functSpec
 ]
 
-class: func ['className blk [block!] "Object words and values." /local explicitMembers localAssignments implicitMembers accessor attribute attributeName defRule] [
+;
+; These would be nice...
+; ...but shorthand does not exist... yet?
+;
+;    yield: make shorthand! [FUNCT-DEF.yielder reduce]
+;    def: make shorthand! [def-core self]
+;    
+
+class: funct ['className blk [block!] "Object words and values."] [
 
 	; Everywhere they say
 	;	def x [spec] [body] 
@@ -104,7 +151,12 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 	; although if Rebol would implement "method" as a way of automatically capturing self, 
 	; this could be reduced to:
 	;	method-def [spec] [body]
-	
+
+	; New feature is to scan for whether they use any yield statements.  If so, we make
+	; 	funct-def/with/yieldable [spec] [body] self
+	; That makes a refinement on the generated function whose argument is named yield
+	; Hence yield isn't really an operator, it's the name of the invisible parameter
+
 	; Also everywhere they say
 	;	attr_accessor .foo
 	; we want to change this into
@@ -125,14 +177,13 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 		any [
 			to [quote def] replaceStart: 
 			4 skip replaceEnd: (
-				use [name spec body] [
-					body: first back replaceEnd 
-					spec: first back back replaceEnd
-					name: first back back back replaceEnd
-					replaceEnd: change/part replaceStart compose/deep/only [
-						(to-set-word name) funct-def/with (spec) (body) self
-					] replaceEnd
-				]
+				replaceBody: first back replaceEnd 
+				replaceSpec: first back back replaceEnd
+				replaceName: first back back back replaceEnd
+
+				replaceEnd: change/part replaceStart compose/deep/only [
+					(to-set-word replaceName) funct-def/with (replaceSpec) (replaceBody) self
+				] replaceEnd
 			) :replaceEnd
 		] to end
 	]
@@ -166,12 +217,10 @@ class: func ['className blk [block!] "Object words and values." /local explicitM
 		] to end
 	]
 
-	use [replaceStart replaceEnd replaceArg replaceWith] [
-		; REVIEW: throw if this does not succeed?
-		; TODO: unify so it's one parse pass?
-		parse blk defRule
-		parse blk attr_accessorRule
-	]
+	; REVIEW: throw if this does not succeed?
+	; TODO: unify so it's one parse pass?
+	parse blk defRule
+	parse blk attr_accessorRule
 
 	; collect the set-words at the first level of the spec
 	; these are the member functions and declared members
@@ -251,7 +300,7 @@ nil?: :none?
 ; Ruby has a "join" method already, and although we could overwrite it with the Ruby
 ; notion of joining this seems better
 
-rubol-join: func [iterable [series!] separator /local pos] [
+ruby-join: func [iterable [series!] separator /local pos] [
 	result: copy ""
 	if not empty? iterable [
 		pos: head iterable
@@ -262,4 +311,30 @@ rubol-join: func [iterable [series!] separator /local pos] [
 		]
 		append result to-string first pos
 	]
+]
+
+; Ruby has do which is a function generator, not a code evaluator.  Currently 
+; making it equivalent to a funct-def with no /with refinement
+
+ruby-do: :does
+
+; Ruby's def works in classes to have access to class members, and outside to act
+; like a function that has access to context.  Unfortunately outside of a class we
+; cannot grab the self without something like shorthand! ... so for now your
+; function cannot grab variables from context *unless* inside a class.  To hack
+; around that you can use def/with (....) self
+
+def: :funct-def
+
+; Ruby's "times" is repeat only it takes functions made with do and not
+; blocks
+; 
+; count = 0
+; 5.times do 
+;   count += 1
+;   puts "count = " + count_to s
+; end
+
+times: func [expr what [function!]] [
+	loop expr [what]
 ]
