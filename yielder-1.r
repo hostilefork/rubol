@@ -45,6 +45,6 @@ class Yielder [
 
 g: Yielder/new []
 
-g/run_some_yields [10] def [value] [
+g/run_some_yields [10] def anonymous [value] [
 	print value
 ]

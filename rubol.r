@@ -135,6 +135,66 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 ]
 
 ;
+; Many languages have the property that they allow two different ways of defining things.
+; One for anonymous things, and another for things with names.  e.g.
+;
+;    (style 1)  function myFunction (a, b) { ... }
+;    (style 2)  myFunction = function (a, b) { ... }
+;
+; Rebol's expectation of knowing the number of parameters in advance doesn't really permit
+; this, although with refinements you could do
+;
+;    function/named [a b] [ ... ] myFunction
+;    myFunction: function [a b] [ ... ]
+;
+; (The reverse case of having a /anonymous refinement does not work because refinements
+; can add parameters but they cannot subtract them.)
+;
+; Clearly it was possible in these languages to have uniformly used style 2, as Rebol
+; does.  Yet it clear that there was a conscious decision to incorporate style 1 even
+; though it is less "uniform".  I believe this has to do with the desire of programmers
+; to differentiate between declaration and assignment.  Also, for objects that need
+; to know their name (for instance, a class declaration which registers that class's
+; name in a dynamic type list) this form is a requirement!
+;
+; There is a workaround format in Rebol:
+;
+;    function myFunction [a b] [ ...]
+;    myFunction: function anonymous [a b] [ ... ]
+;
+; The anonymous word would signify to the abstraction that it is not to set a name.
+; While anonymous is a little bit wordy, it's fairly obvious and more literate
+; (while words like "noname" are hard to scan).
+;
+; We could call this pattern declare, but "var" is short and familiar:
+;
+;    >> var a (1 + 1)
+;    == 2
+;
+;    >> probe a
+;    2
+;    == 2
+;
+; If you pass in a block, it will be evaluated as if you had written that block out
+; after a set-word.
+;
+;    >> var b [reverse "hello"]
+;    == "olleh"
+;
+;    >> print b
+;    olleh
+;
+
+var: func ['varName [word!] args] [
+	either (varName = 'anonymous) [
+		do args
+	] [
+		do append reduce [to-set-word varName] args
+	]
+]
+
+
+;
 ; These would be nice...
 ; ...but shorthand does not exist... yet?
 ;
@@ -142,15 +202,21 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 ;    def: make shorthand! [def-core self]
 ;    
 
-class: funct ['className blk [block!] "Object words and values."] [
+class: func ['className blk [block!] "Object words and values."] [
+	var (className) [make-class/named blk to-string className]
+]
+
+make-class: funct [
+	blk [block!] "Object words and values."
+	/named className [string!] "Optional class name for this class"
+] [
 
 	; Everywhere they say
 	;	def x [spec] [body] 
 	; what we really want to do is
-	; 	funct-def/with [spec] [body] self
-	; although if Rebol would implement "method" as a way of automatically capturing self, 
-	; this could be reduced to:
-	;	method-def [spec] [body]
+	; 	def-core self [spec] [body]
+	; It does not seem possible to make def capture self within the object without
+	; explicit parameterization
 
 	; New feature is to scan for whether they use any yield statements.  If so, we make
 	; 	funct-def/with/yieldable [spec] [body] self
@@ -182,7 +248,7 @@ class: funct ['className blk [block!] "Object words and values."] [
 				replaceName: first back back back replaceEnd
 
 				replaceEnd: change/part replaceStart compose/deep/only [
-					(to-set-word replaceName) funct-def/with (replaceSpec) (replaceBody) self
+					(to-set-word replaceName) make-def-core self (replaceSpec) (replaceBody)
 				] replaceEnd
 			) :replaceEnd
 		] to end
@@ -250,23 +316,66 @@ class: funct ['className blk [block!] "Object words and values."] [
 	; give the meta-class object a member "new" which is a function 
 	; that will instantiate a Rebol object
 
-	do reduce [to-set-word className object compose/deep [
-		new: func [args [block!] /local newObject] [
-			newObject: object [
-				class: object [name: (to-string className)]
-				(implicitMembers)
-				(blk)
-				(protectAccessors)
+	return do reduce [
+		object compose/deep [
+			new: func [args [block!] /local newObject] [
+				newObject: object [
+					class: object [name: (className)]
+					(implicitMembers)
+					(blk)
+					(protectAccessors)
+				]
+
+				;probe newObject
+
+				newObject/initialize args
+				return newObject
 			]
-
-			; probe newObject
-
-			newObject/initialize args
-			return newObject
 		]
 	]
+]
+
+;
+; def also comes in def and make-def variants
+;
+
+def: func ['defName spec [none! block!] body [block!]] [
+	var (defName) [make-def/named spec body to-string defName]
+]
+
+make-def: func [spec [none! block!] body [block!] /named defName [string!]] [
+	either named [
+		make-def-core/named none spec body defName
+	] [
+		make-def-core none spec body
 	]
-	none
+]
+
+;
+; Ruby's def works in classes to have access to class members, and outside to act
+; like a function that has access to context.  Unfortunately outside of a class we
+; cannot grab the self without something like shorthand! ... so for now your
+; function cannot grab variables from context *unless* inside a class.  To hack
+; around that you can use make-def-core self  (....) self
+;
+; This works inside classes, which will convert def or make-def into make-def-core
+; during their creation.  Outside of classes, however, it won't work.  I have
+; proposed a fix:
+;
+;    make-def: make shorthand! [make-def-core spec]
+;
+
+def-core: func [me [object!] 'defName spec [none! block!] body [block!]] [
+	var (defName) [make-def-core me spec body to-string defName]
+]
+
+make-def-core: func [me [none! object!] spec [none! block!] body [block!] /named defName [string!]] [
+	; for now we ignore defName, but does Ruby need it for RTTI?
+	either none? me [
+		funct-def spec body
+	] [
+		funct-def/with spec body me
+	]
 ]
 
 ; Ruby has an operation called puts that calls the to_s method on the passed in
@@ -318,13 +427,7 @@ ruby-join: func [iterable [series!] separator /local pos] [
 
 ruby-do: :does
 
-; Ruby's def works in classes to have access to class members, and outside to act
-; like a function that has access to context.  Unfortunately outside of a class we
-; cannot grab the self without something like shorthand! ... so for now your
-; function cannot grab variables from context *unless* inside a class.  To hack
-; around that you can use def/with (....) self
 
-def: :funct-def
 
 ; Ruby's "times" is repeat only it takes functions made with do and not
 ; blocks

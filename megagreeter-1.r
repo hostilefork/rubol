@@ -58,7 +58,7 @@ class MegaGreeter [
 		] [
     			either block? .names [
 				; join the list elements with commas
-				puts to-string compose ["Goodbye " (rubol-join .names ", ") ".  Come back soon!"]
+				puts to-string compose ["Goodbye " (ruby-join .names ", ") ".  Come back soon!"]
 			] [
       				puts to-string compose ["Goodbye " (.names) ".  Come back soon!"]
 			]
