@@ -108,7 +108,7 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /no-with-
 	]
 
 	paramInfo: get-parameter-information specDef
-	functSpec: compose/deep [funct-static [
+	functSpec: compose/deep [func-static [
 			FUNCT-DEF.args [block!]
 			(either yieldable [[FUNCT-DEF.yielder [function! block!]]] [[]])
 		] [
@@ -158,9 +158,7 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /no-with-
 ; Clearly it was possible in these languages to have uniformly used style 2, as Rebol
 ; does.  Yet it clear that there was a conscious decision to incorporate style 1 even
 ; though it is less "uniform".  I believe this has to do with the desire of programmers
-; to differentiate between declaration and assignment.  Also, for objects that need
-; to know their name (for instance, a class declaration which registers that class's
-; name in a dynamic type list) this form is a requirement!
+; to differentiate between declaration and assignment.
 ;
 ; There is a workaround format in Rebol:
 ;
@@ -188,6 +186,19 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /no-with-
 ;
 ;    >> print b
 ;    olleh
+;
+; The caveat is that such declarations are not seen by scans for set-words.  This
+; interferes with abstractions that assume all set-words are at source level
+; (e.g. funct).
+; 
+; It is a stopgap measure to ease compatibility for certain things like classes
+; which must know their name in Rubol.  To get the usual benefit of being a set
+; word, the equivalent:
+;
+;    c: make-class [ ... ]
+;    d: make-def [ ... ]
+;
+; ...should be used instead when possible.
 ;
 
 var: func ['varName [word!] args] [
@@ -502,4 +513,75 @@ ruby-block: func [code [block!]] [
 
 times: func [expr what [function!]] [
 	loop expr [what]
+]
+
+; Ruby has the ability to define ranges.  We don't want to produce a whole series out of a range
+; but rather a function that can count for us.  They use two dots to mean "up to value" and
+; three dots to mean "up to and including"
+
+range: func [span [block!]] [
+	return func-static [] [
+		RANGE.span: span
+		state: none
+	] [
+		either none? state [
+			state: first RANGE.span
+		] [
+			state: state + 1
+		]
+
+		; This ruby convention seems backwards to me
+		; two dots would seem to indicate "not quite all the way there"
+		; while the third dot would mean "all the way there"
+		; but, the reverse is true
+
+		if ('.. = second RANGE.span) and (state > third RANGE.span) [
+			return none
+		]
+		if ('... = second RANGE.span) and (state >= third RANGE.span) [
+			return none
+		]
+		return state
+	]
+]
+
+; Ruby's inject is an operation that works with range as a function generator
+; or with series.
+
+inject: func [iterable [block! series! function!] f [block! function!] /initial init /local accumulator pos value] [
+	if not function? :iterable [
+		pos: iterable
+	]
+
+	either initial [
+		accumulator: init
+	] [
+		either function? :iterable [
+			accumlator: iterable
+			if none? accumulator [
+				return
+			]
+		] [
+			if empty? iterable [
+				return
+			]
+			accumulator: first back pos: next pos
+		]
+	]
+
+	if block? f [
+		f: ruby-block f
+	]
+
+	either function? :iterable  [
+		while [not none? value: iterable] [
+			accumulator: f reduce [accumulator value]
+		]
+	] [
+		while [not tail? pos] [
+			accumulator: f reduce [accumulator first pos]
+			pos: next pos
+		]
+	]
+	return accumulator
 ]

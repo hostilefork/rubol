@@ -15,11 +15,6 @@ REBOL [
 	refinement for resetting the static locals to the expressions that
 	were used to initialize them.
 
-	I've also added something called "funct-def" as a helper for Ruby
-	interoperability which can accept defaults.  It may be useful in its
-	own right, although it does diverge from Rebol's model of every
-	function callsite having the argument count in advance.
-
 	!!!WARNING: This is very experimental right now and I would like some
 	people with more experience writing these sorts of things to give it
 	a look.  It needs error handling and a lot of other things.  (Also there 
@@ -171,7 +166,11 @@ get-parameter-information: func [parameters [block!] /local result expression po
 	return result
 ]
 
-funct-static: func [spec [block!] statics [block!] body [block!] /with withObject /no-with-hack /resettable /local objSpec staticsInfo] [
+; NOTE: there is no funct variation at this point in time
+; It was attempted and then reverted
+; If anyone can figure out how to implement a funct-static beast please do
+
+func-static: func [spec [block!] statics [block!] body [block!] /resettable /local objSpec staticsInfo] [
 
 	; We are going to make an object which initializes some local members to look
 	; just like the statics parameter
@@ -184,7 +183,7 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 
 	if resettable [
 		append objSpec compose/deep [
-			FUNCT-STATIC.reset: func [] [
+			FUNC-STATIC.reset: func [] [
 				do [(statics)]
 			]
 		]
@@ -202,21 +201,21 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 		; context, or the caller-specified "with" context.
 		; so we must explicitly pass the statics as parameters
 
-		FUNCT-STATIC.main: (either with [[funct/with]] [either no-with-hack [[func]] [[funct]]]) [(spec) (staticsInfo/spec)] [
+		FUNC-STATIC.main: func [(spec)] [
 			(body)
-		] (either with [[withObject]] [[]]) 
+		]  
 
 		; Unlike the main funct, the run function *IS* bound inside the object
 		; we are declaring.  Thus it can read the statics long enough to proxy
 		; them as parameters to the main, which runs in the context desired by
 		; the caller at the point of definition.
 
- 		FUNCT-STATIC.run: funct/with [(spec) (either resettable [[/reset]] [[]])] [
+ 		FUNC-STATIC.run: func [(spec) (either resettable [[/reset]] [[]])] [
 			(either resettable [
-				[if reset [FUNCT-STATIC.reset]]
+				[if reset [FUNC-STATIC.reset]]
 			] [[]])
 
-			FUNCT-STATIC.mainArgs: copy [(collect-words spec) (staticsInfo/spec)]
+			FUNC-STATIC.mainArgs: copy [(collect-words spec)]
 
 			; This is a bit tricky.  If one declares a static member that is a
 			; function assignment, you can't simply use the word you assigned
@@ -224,23 +223,23 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 			; call the function.  Here's the temporary solution: turn any
 			; words into get words, probably something better...
 
-			FUNCT-STATIC.argIterator: FUNCT-STATIC.mainArgs
-			while [not tail? FUNCT-STATIC.argIterator] [
-				if word? first FUNCT-STATIC.argIterator [
-					change FUNCT-STATIC.argIterator to-get-word first FUNCT-STATIC.argIterator
+			FUNC-STATIC.argIterator: FUNC-STATIC.mainArgs
+			while [not tail? FUNC-STATIC.argIterator] [
+				if word? first FUNC-STATIC.argIterator [
+					change FUNC-STATIC.argIterator to-get-word first FUNC-STATIC.argIterator
 				]
-				FUNCT-STATIC.argIterator: next FUNCT-STATIC.argIterator
+				FUNC-STATIC.argIterator: next FUNC-STATIC.argIterator
 			]
 
-			;insert FUNCT-STATIC.mainArgs [(collect-words spec)] 
+			;insert FUNC-STATIC.mainArgs [(collect-words spec)] 
 
-			return do append to-block 'FUNCT-STATIC.main FUNCT-STATIC.mainArgs
-		] self
+			return do append to-block 'FUNC-STATIC.main FUNC-STATIC.mainArgs
+		]
 	]
 
-	;print "Object specification for funct-static"
+	;print "Object specification for FUNC-STATIC"
 	;probe objSpec
 	;print newline
 
-	return select make object! objSpec 'FUNCT-STATIC.run
+	return select make object! objSpec 'FUNC-STATIC.run
 ]
