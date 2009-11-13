@@ -41,12 +41,14 @@ ruby-print [newline "product=" product ]
 
 comment [{
 
-In Rebol, this outputs the same thing.
+When Rebol has been loaded with the "Rubol" translation layer, this outputs the same thing.
 
 	1, 8, 27, 64, 125, 216, 343, 
 	sum=784
 	product=128024064000
 
-Cleaner, though.  And it isn't even "proper Rebol"...whatever that means.  :)
+This is not how people would natively program in Rebol, but it is generally compatible!
+If this piques your interest you should learn how Rebol programmers would do it differently
+and why.
 
 }]
