@@ -54,7 +54,7 @@ puts sum
 ;you can do interesting things like build hashes
 
 hash: inject/initial primes [ [s e] append s reduce [(to-string e) e] ] (make map! [])
-probe hash  
+p hash  
 
 
 

@@ -674,6 +674,24 @@ ruby-inject: func [iterable [block! series! function!] f [block! function!] /ini
 
 ruby-for: :ruby-each
 
+; To help make compatible example output, rather than print out things
+; like "make map!" it's easy enough to match Ruby so why not?  add
+; more types...
+
+ruby-p: func [arg [map!] /local result temp] [
+	result: none
+	foreach [key value] arg [
+		either none? result [
+			result: copy "{"
+		] [
+			append result ", "
+		]
+		append result rejoin [mold key "=>" mold value]
+	]
+	append result "}"
+	print result
+]
+
 ;
 ; The current policy is to let Ruby keywords be defined in the global namespace if no Rebol
 ; equivalent word exists.  Something similar to the secure policy language might be good for
@@ -686,3 +704,4 @@ times: :ruby-times
 each: :ruby-each
 detect: :ruby-detect
 inject: :ruby-inject
+p: :ruby-p
