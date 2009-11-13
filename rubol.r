@@ -511,15 +511,17 @@ ruby-block: func [code [block!]] [
 ;   puts "count = " + count_to s
 ; end
 
-times: func [expr what [function!]] [
+ruby-times: func [expr what [function!]] [
 	loop expr [what]
 ]
 
 ; Ruby has the ability to define ranges.  We don't want to produce a whole series out of a range
-; but rather a function that can count for us.  They use two dots to mean "up to value" and
-; three dots to mean "up to and including"
+; but rather a function that can count for us.  They use two dots to mean "up to and
+; including value" and three dots to mean "up to value but not including".  (Seems backwards
+; to me, but it is what it is.)  Originally I called this "range" but changed to ruby-in
+; to make it more compatible with the appearance of Ruby's for loops
 
-range: func [span [block!]] [
+ruby-in: func [span [block!]] [
 	return func-static [] [
 		RANGE.span: span
 		state: none
@@ -529,11 +531,6 @@ range: func [span [block!]] [
 		] [
 			state: state + 1
 		]
-
-		; This ruby convention seems backwards to me
-		; two dots would seem to indicate "not quite all the way there"
-		; while the third dot would mean "all the way there"
-		; but, the reverse is true
 
 		if ('.. = second RANGE.span) and (state > third RANGE.span) [
 			return none
@@ -545,10 +542,94 @@ range: func [span [block!]] [
 	]
 ]
 
+; Ruby has each which works with generative objects (e.g. ranges) as well as series
+
+ruby-each: func [iterable [block! series! function!] f [block! function!] /local pos value] [
+	if not function? :iterable [
+		pos: iterable
+	]
+
+	if block? f [
+		f: ruby-block f
+	]
+
+	either function? :iterable  [
+		while [not none? value: iterable] [
+			 f append/only copy [] value
+		]
+	] [
+		while [not tail? pos] [
+			f append/only copy [] first pos
+			pos: next pos
+		]
+	]
+	return none
+]
+
+; detect gives back the first item matching a logical expression, e.g. the function we
+; run returns a boolean saying whether we match.  copy/paste for now, improve...
+
+ruby-detect: func [iterable [block! series! function!] f [block! function!] /local pos value] [
+	if not function? :iterable [
+		pos: iterable
+	]
+
+	if block? f [
+		f: ruby-block f
+	]
+
+	either function? :iterable  [
+		while [not none? value: iterable] [
+			if f append/only copy [] value [
+				return value
+			]
+		]
+	] [
+		while [not tail? pos] [
+			if f append/only copy [] first pos [
+				return first pos
+			]
+			pos: next pos
+		]
+	]
+	return none
+]
+
+; select is like detect but returns a block of matches
+
+ruby-select: func [iterable [block! series! function!] f [block! function!] /local pos value result] [
+	result: copy []
+
+	if not function? :iterable [
+		pos: iterable
+	]
+
+	if block? f [
+		f: ruby-block f
+	]
+
+	either function? :iterable  [
+		while [not none? value: iterable] [
+			if f append/only copy [] value [
+				append/only result value
+			]
+		]
+	] [
+		while [not tail? pos] [
+			if f append/only copy [] first pos [
+				append/only result first pos
+			]
+			pos: next pos
+		]
+	]
+	return result
+]
+
+
 ; Ruby's inject is an operation that works with range as a function generator
 ; or with series.
 
-inject: func [iterable [block! series! function!] f [block! function!] /initial init /local accumulator pos value] [
+ruby-inject: func [iterable [block! series! function!] f [block! function!] /initial init /local accumulator pos value] [
 	if not function? :iterable [
 		pos: iterable
 	]
@@ -585,3 +666,23 @@ inject: func [iterable [block! series! function!] f [block! function!] /initial 
 	]
 	return accumulator
 ]
+
+; Ruby's for is a lot like it's each, just slightly different syntax
+; http://blade.nagaokaut.ac.jp/cgi-bin/scat.rb/ruby/ruby-talk/132518
+; In Rubol we make them equivalent.  In fact, you must use ruby-in to
+; turn a block parameter into a range.
+
+ruby-for: :ruby-each
+
+;
+; The current policy is to let Ruby keywords be defined in the global namespace if no Rebol
+; equivalent word exists.  Something similar to the secure policy language might be good for
+; turning on and off the keywords... and allowing users to override things like "do" and "join"
+; but then put them back to the defaults later.
+;
+
+range: :ruby-range
+times: :ruby-times
+each: :ruby-each
+detect: :ruby-detect
+inject: :ruby-inject

@@ -48,7 +48,7 @@ puts product
 
 ;just for fun let's sum all the numbers from 1 to, oh, say a million
 
-sum: inject/initial range [1 .. 1000000] [ [cumulative n] cumulative + n ] 0
+sum: inject/initial ruby-in [1 .. 1000000] [ [cumulative n] cumulative + n ] 0
 puts sum
 
 ;you can do interesting things like build hashes
