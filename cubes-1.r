@@ -30,7 +30,7 @@ def cubes [max] [
 		i: i + 1
 	]
 ]
-cubes [8] [ [x] ruby-print rejoin [x ", "] ]
+cubes [8] [ [x] ruby-print [x ", "] ]
 sum: 0
 cubes [8] [ [y] sum: sum + y ]
 ruby-print [newline "sum=" sum ]
