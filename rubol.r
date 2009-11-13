@@ -490,15 +490,39 @@ ruby-do: :does
 ;
 ; (Code in the ... obviously will be a little different)
 
-ruby-block: func [code [block!]] [
-	if empty? code [
-		return make-def [] []
-	]
+; From http://www.devarticles.com/c/a/Ruby-on-Rails/Code-Blocks-and-Iteration/
+; Arguments to blocks look almost like arguments to methods, but there are a few 
+; restrictions: you canÕt set default values for block arguments, you canÕt expand 
+; hashes or arrays inline, and a block cannot itself take a block argument.*
+
+; Hey, no defaults.  So we don't have to use def!  Func is more efficient.
+; We still want to use blocks to pass parameters in order to make the lambda
+; compatible with make-def.  If they want a func!, they'll use func!
+
+ruby-lambda: func [code [block!] /local assignments index] [
 	either block? first code [
-		return make-def first code copy next code
+		assignments: copy []
+		index: 1
+		foreach arg first code [
+			repend assignments [to-set-word arg 'pick 'RUBY-LAMBDA.args index]
+			index: index + 1
+		]
+		return func [RUBY-LAMBDA.args [block!]] append assignments next code
 	] [
-		return make-def [] code
+		return func [] code
 	]
+
+; Does it allow defaults?  If not, we can optimize.  In fact make-def
+; can optimize down to a funct.  Hm.
+
+;	if empty? code [
+;		return make-def [] []
+;	]
+;	either block? first code [
+;		return make-def first code copy next code
+;	] [
+;		return make-def [] code
+;	]
 ]
 
 
@@ -521,150 +545,154 @@ ruby-times: func [expr what [function!]] [
 ; to me, but it is what it is.)  Originally I called this "range" but changed to ruby-in
 ; to make it more compatible with the appearance of Ruby's for loops
 
-ruby-in: func [span [block!]] [
-	return func-static [] [
-		RANGE.span: span
-		state: none
-	] [
-		either none? state [
-			state: first RANGE.span
-		] [
-			state: state + 1
-		]
+; UPDATE: Ruby apparently optimizes for the range case more than just using a function.
+; This will have be tuned for performance, perhaps by returning an object which the
+; ruby-each-core can probe for the range start and range end and then run in a tight
+; loop...
 
-		if ('.. = second RANGE.span) and (state > third RANGE.span) [
-			return none
-		]
-		if ('... = second RANGE.span) and (state >= third RANGE.span) [
-			return none
-		]
-		return state
+ruby-in: func [span [block!] /local o] [
+	if not found? second span [.. ...] [
+		throw make error! "second element of block for ruby-in must be either .. or ..."
 	]
+	
+	o: object [
+		minVal: first span
+		maxVal: either '.. = second span [1 + third span] [third span]
+		state: none
+		getNext: func [] [
+			either none? state [
+				state: minVal
+			] [
+				state: state + 1
+			]
+
+			either state < maxVal [
+				state ; <-- return
+			] [
+				state: none ; <-- return
+			]
+		]
+	]
+	:o/getNext ; <-- return
 ]
 
 ; Ruby has each which works with generative objects (e.g. ranges) as well as series
+; This is the generalized iterator logic
 
-ruby-each: func [iterable [block! series! function!] f [block! function!] /local pos value] [
+; you provide it with a function that takes the value.
+; returning true continues the iteration, returning false stops it
+
+ruby-each-core: func [iterable [block! series! function!] action [function!] /local pos value] [
 	if not function? :iterable [
 		pos: iterable
 	]
 
-	if block? f [
-		f: ruby-block f
-	]
-
 	either function? :iterable  [
 		while [not none? value: iterable] [
-			 f append/only copy [] value
+			 if not do action value [
+			 	return none
+			 ]
 		]
 	] [
 		while [not tail? pos] [
-			f append/only copy [] first pos
+			if not do action first pos [
+				return none
+			]
 			pos: next pos
 		]
 	]
-	return none
+	none ; <-- returned
+]
+
+ruby-each: func [iterable [block! series! function!] f [block! function!]] [
+	if block? f [
+		f: ruby-lambda f
+	]
+	ruby-each-core :iterable func [value] [
+		f append/only copy [] value 
+		true ; <-- returned
+	]
+	none ; <-- returned
 ]
 
 ; detect gives back the first item matching a logical expression, e.g. the function we
-; run returns a boolean saying whether we match.  copy/paste for now, improve...
+; run returns a boolean saying whether we match.
 
-ruby-detect: func [iterable [block! series! function!] f [block! function!] /local pos value] [
-	if not function? :iterable [
-		pos: iterable
-	]
-
+ruby-detect: func [iterable [block! series! function!] f [block! function!] /local result] [
 	if block? f [
-		f: ruby-block f
+		f: ruby-lambda f
 	]
-
-	either function? :iterable  [
-		while [not none? value: iterable] [
-			if f append/only copy [] value [
-				return value
-			]
-		]
-	] [
-		while [not tail? pos] [
-			if f append/only copy [] first pos [
-				return first pos
-			]
-			pos: next pos
+	
+	result: none
+	ruby-each-core :iterable func [value] [
+		either f append/only copy [] value [
+			result: value
+			false ; <-- returned
+		] [
+			true ; <-- returned
 		]
 	]
-	return none
+	result ; <-- returned
 ]
 
 ; select is like detect but returns a block of matches
 
-ruby-select: func [iterable [block! series! function!] f [block! function!] /local pos value result] [
-	result: copy []
-
-	if not function? :iterable [
-		pos: iterable
-	]
-
+ruby-select: func [iterable [block! series! function!] f [block! function!] /local results] [
 	if block? f [
-		f: ruby-block f
+		f: ruby-lambda f
 	]
 
-	either function? :iterable  [
-		while [not none? value: iterable] [
-			if f append/only copy [] value [
-				append/only result value
-			]
-		]
-	] [
-		while [not tail? pos] [
-			if f append/only copy [] first pos [
-				append/only result first pos
-			]
-			pos: next pos
-		]
+	results: copy []
+	ruby-each-core :iterable func [value] [
+		if f append/only copy [] value [
+			append/only results value
+		] 
+		true ; <-- returned
 	]
-	return result
+	results ; <-- returned
 ]
 
 
-; Ruby's inject is an operation that works with range as a function generator
-; or with series.
+;
+; Ruby's inject is an operation that loops over the values in the iterable object, calling a
+; function on each iteration which takes two values.  The first value is the result that
+; came from the previous call.  The second value is the current element being iterated.
+;
+; To deal with the question of what the first parameter is when you call on the first element,
+; there are two options.  The default is that you skip the first element entirely and just make
+; it the first parameter to the call for the second element.
+;
+; The second option is to supply an initial value which is fed to the call with the first
+; element, and we specify that using a refinement (/initial)
+;
 
-ruby-inject: func [iterable [block! series! function!] f [block! function!] /initial init /local accumulator pos value] [
-	if not function? :iterable [
-		pos: iterable
-	]
-
-	either initial [
-		accumulator: init
-	] [
-		either function? :iterable [
-			accumlator: iterable
-			if none? accumulator [
-				return
-			]
-		] [
-			if empty? iterable [
-				return
-			]
-			accumulator: first back pos: next pos
-		]
-	]
-
+ruby-inject: func [
+	iterable [block! series! function!] 
+	f [block! function!] 
+	/initial init 
+	/local o
+] [
 	if block? f [
-		f: ruby-block f
+		f: ruby-lambda f
 	]
 
-	either function? :iterable  [
-		while [not none? value: iterable] [
-			accumulator: f reduce [accumulator value]
-		]
-	] [
-		while [not tail? pos] [
-			accumulator: f reduce [accumulator first pos]
-			pos: next pos
+	o: object [
+		lastResult: either initial [init] [none]
+		needsInit: either initial [false] [true]
+		userFunc: :f 
+		iterFunc: func [value] [
+			either needsInit [
+				lastResult: value
+				needsInit: false
+			] [
+				lastResult: userFunc reduce [lastResult value]
+			]
+			true ; <-- returned
 		]
 	]
-	return accumulator
+		
+	ruby-each-core :iterable :o/iterFunc
+	o/lastResult ; <-- returned
 ]
 
 ; Ruby's for is a lot like it's each, just slightly different syntax
@@ -699,7 +727,7 @@ ruby-p: func [arg [map!] /local result temp] [
 ; but then put them back to the defaults later.
 ;
 
-range: :ruby-range
+lambda: :ruby-lambda
 times: :ruby-times
 each: :ruby-each
 detect: :ruby-detect
