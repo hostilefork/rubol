@@ -85,7 +85,7 @@ find-callback: func [
 ]
 
 
-funct-def: func [specDef [block! none!] body [block!] /with withObject /local paramInfo functSpec pos yieldable] [
+funct-def: func [specDef [block! none!] body [block!] /with withObject /no-with-hack /local paramInfo functSpec pos yieldable] [
 
 	; look for uses of yield in body
 	; seems to be no find/deep
@@ -99,7 +99,11 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 		either with [
 			return funct/with [(either yieldable [[yield]] [[]])] body withObject
 		] [
-			return funct [(either yieldable [[yield]] [[]])] body
+			either no-with-hack [
+				return funct/no-with-hack [(either yieldable [[yield]] [[]])] body
+			] [
+				return funct [(either yieldable [[yield]] [[]])] body
+			]
 		]
 	]
 
@@ -109,7 +113,7 @@ funct-def: func [specDef [block! none!] body [block!] /with withObject /local pa
 			(either yieldable [[FUNCT-DEF.yielder [function! block!]]] [[]])
 		] [
 			FUNCT-DEF.defaults: [(paramInfo/defaults)]
-			FUNCT-DEF.main: (either with [[funct/with]] [[funct]]) [
+			FUNCT-DEF.main: (either with [[funct/with]] [either no-with-hack [[func]] [[funct]]]) [
 				(paramInfo/spec) (either yieldable [[FUNCT-DEF.yielder [function! block!]]] [[]])
 			] [
 				(either yieldable [[if block? :FUNCT-DEF.yielder [FUNCT-DEF.yielder: ruby-block FUNCT-DEF.yielder]]] [[]])
@@ -371,9 +375,16 @@ def-core: func [me [object!] 'defName spec [none! block!] body [block!]] [
 ]
 
 make-def-core: func [me [none! object!] spec [none! block!] body [block!] /named defName [string!]] [
+
 	; for now we ignore defName, but does Ruby need it for RTTI?
+
 	either none? me [
-		funct-def spec body
+		; since we cannot automatically capture the self from our context
+		; this is currently needed to be a func if used in global scope.
+		; a fairly nasty hack which could be finessed with shorthand! or
+		; perhaps another technique
+
+		funct-def/no-with-hack spec body
 	] [
 		funct-def/with spec body me
 	]
@@ -387,6 +398,22 @@ puts: func [arg] [
 		print arg/to_s
 	] [
 		print to-string arg
+	]
+]
+
+; I'm not entirely sure what the difference between Ruby's print and puts is,
+; but it's clear that print doesn't put out a newline.  That corresponds to
+; Rebol's "prin"
+
+ruby-print: func [arg] [
+	either object? arg [
+		prin arg/to_s
+	] [
+		either block? arg [
+			prin rejoin arg
+		] [
+			prin to-string arg
+		]
 	]
 ]
 

@@ -171,7 +171,7 @@ get-parameter-information: func [parameters [block!] /local result expression po
 	return result
 ]
 
-funct-static: func [spec [block!] statics [block!] body [block!] /with withObject /resettable /local objSpec staticsInfo] [
+funct-static: func [spec [block!] statics [block!] body [block!] /with withObject /no-with-hack /resettable /local objSpec staticsInfo] [
 
 	; We are going to make an object which initializes some local members to look
 	; just like the statics parameter
@@ -202,7 +202,7 @@ funct-static: func [spec [block!] statics [block!] body [block!] /with withObjec
 		; context, or the caller-specified "with" context.
 		; so we must explicitly pass the statics as parameters
 
-		FUNCT-STATIC.main: (either with [[funct/with]] [[funct]]) [(spec) (staticsInfo/spec)] [
+		FUNCT-STATIC.main: (either with [[funct/with]] [either no-with-hack [[func]] [[funct]]]) [(spec) (staticsInfo/spec)] [
 			(body)
 		] (either with [[withObject]] [[]]) 
 

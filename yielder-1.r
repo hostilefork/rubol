@@ -63,22 +63,22 @@ class Yielder [
 	]
 ]
 
-g: Yielder/new []
+y: Yielder/new []
 
 ; using the style where def comes first, but indicating it should be anonymous
 
-g/run_some_yields [10] def anonymous [value] [
+y/run_some_yields [10] def anonymous [value] [
 	print value
 ]
 print newline
 
 ; make-def is a variation which does not take a name
 
-g/run_some_yields [5] make-def [value] [
+y/run_some_yields [5] make-def [value] [
 	print value
 ]
 print newline
 
 ; Demonstration of support for Ruby's "block style" of function definition
 
-g/employee_yield [4] [ [ last first ] puts compose ["employee : " (first) " " (last)] ]
+y/employee_yield [4] [ [ last first ] puts compose ["employee : " (first) " " (last)] ]
