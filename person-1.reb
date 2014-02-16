@@ -1,18 +1,18 @@
 Rebol [
 	Title: "Person Ported From Juixe.com Tutorial"
-	Description: {Very early test of multiple attr_accessor, to_s,
-	and some starting work, adapted from the website:
+	Description: {
+		Very early test of multiple attr_accessor, to_s,
+		and some starting work, adapted from the website:
 
-		http://juixe.com/techknow/index.php/2007/01/22/ruby-class-tutorial/
+			http://juixe.com/techknow/index.php/2007/01/22/ruby-class-tutorial/
 
-	The original code didn't make it quite clear to me what the object
-	lifetime was, so I'll have to look into that.
-	}
-	
+		The original code didn't make it quite clear to me what the object
+		lifetime was, so I'll have to look into that.
+	}	
 ]
 
 ; Include the code that makes Rebol act more like Ruby
-do %rubol.r
+do %rubol.reb
 
 class Person [
 	attr_accessor [.fname .lname]

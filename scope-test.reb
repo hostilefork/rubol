@@ -11,13 +11,13 @@ Rebol [
 	Home: http://hostilefork.com/
 	License: mit
 	
-	File: %scope-test.r
+	File: %scope-test.reb
 	Date: 10-Nov-2009
 	Version: 0.1.1
 ]
 
-do %rubol.r
-do %checkpoint.r
+do %rubol.reb
+do %checkpoint.reb
 
 checkpoint A [x y z]
 

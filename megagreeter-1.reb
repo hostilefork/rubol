@@ -1,31 +1,32 @@
 Rebol [
 	Title: "MegaGreeter From Ruby Language Tutorial Step #1"
-	File: %megagreeter-1.r
+	File: %megagreeter-1.reb
 
-	Usage: {Fire up a Rebol interpreter in the directory where these files
+	Usage: {
+		Fire up a Rebol interpreter in the directory where these files
         are located.  Then at the command line, type:
 
-                do %megagreeter-1.r
+			do %megagreeter-1.reb
 
         When it runs, you should get the output:
 
-		Hello World!
-		Goodbye World.  Come back soon!
-		Hello Zeke!
-		Goodbye Zeke.  Come back soon!
-		Hello Albert!
-		Hello Brenda!
-		Hello Charles!
-		Hello Dave!
-		Hello Englebert!
-		Goodbye Albert, Brenda, Charles, Dave, Englebert.  Come back soon!
-		...
-		...
+			Hello World!
+			Goodbye World.  Come back soon!
+			Hello Zeke!
+			Goodbye Zeke.  Come back soon!
+			Hello Albert!
+			Hello Brenda!
+			Hello Charles!
+			Hello Dave!
+			Hello Englebert!
+			Goodbye Albert, Brenda, Charles, Dave, Englebert.  Come back soon!
+			...
+			...
 	}
 ]
 
 ; Include the code that makes Rebol act more like Ruby
-do %rubol.r
+do %rubol.reb
 
 class MegaGreeter [
 	attr_accessor .names
@@ -56,11 +57,15 @@ class MegaGreeter [
 		either nil? .names [
 			puts "..."
 		] [
-    			either block? .names [
+    		either block? .names [
 				; join the list elements with commas
-				puts to-string compose ["Goodbye " (ruby-join .names ", ") ".  Come back soon!"]
+				puts to-string compose [
+					"Goodbye " (ruby-join .names ", ") ".  Come back soon!"
+				]
 			] [
-      				puts to-string compose ["Goodbye " (.names) ".  Come back soon!"]
+      			puts to-string compose [
+      				"Goodbye " (.names) ".  Come back soon!"
+      			]
 			]
 		]
 	]
@@ -76,8 +81,7 @@ mg/say_hi []
 mg/say_bye []
 
 ; Change the name to an array of names
-mg/names/set ["Albert" "Brenda" "Charles"
-    "Dave" "Englebert"]
+mg/names/set ["Albert" "Brenda" "Charles" "Dave" "Englebert"]
 mg/say_hi []
 mg/say_bye []
 
